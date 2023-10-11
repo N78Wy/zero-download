@@ -33,7 +33,12 @@ zero搬运网图片下载工具，使用Golang编写，目前已测试Windows/Li
 
 ## Q&A
 Q: 下载的漫画缺少了最后三章。
-- 没有VIP无法下载最后三章，需要充值后登录，再拿到`cookie`配置到`config.json`中，`cookie`示例: `Ckng_2132_saltkey=E7K23498; Ckng_2132_lastvisit=1696051487; Ckng_2132_sid=D64120; Ckng_2132_ulastactivity=944e5BiEzeqsqqwdXaEKsqPPcLtxNuO8dphVSVjRirNf2s6N; Ckng_2132_auth=f38eXts9SEIPWD81MtentRnMUNlICqDRoqwdq2s2l%2BMDbJ9GEKraGK3wGFZ634AGHkN67xZxgrMBxL8XGhilw; Ckng_2132_lastcheckfeed=3589691%7C1696055094; Ckng_2132_lip=113.69.124.110%2C1696047324; Ckng_2132_lastact=1696055200%09home.php%09spacecp`
+- 没有VIP无法下载最后三章，需要充值后登录，再拿到`cookie`配置到`config.json`中，`cookie`示例:
+```json
+{
+    "cookie": "Ckng_2132_saltkey=E7K23498; Ckng_2132_lastvisit=1696051487; Ckng_2132_sid=D64120; Ckng_2132_ulastactivity=944e5BiEzeqsqqwdXaEKsqPPcLtxNuO8dphVSVjRirNf2s6N; Ckng_2132_auth=f38eXts9SEIPWD81MtentRnMUNlICqDRoqwdq2s2l%2BMDbJ9GEKraGK3wGFZ634AGHkN67xZxgrMBxL8XGhilw; Ckng_2132_lastcheckfeed=3589691%7C1696055094; Ckng_2132_lip=113.69.124.110%2C1696047324; Ckng_2132_lastact=1696055200%09home.php%09spacecp"
+}
+```
 
 Q: 下载到一半没下完怎么办。
 - 不移动或者改文件名的话，会自动跳过已经下载好的文件
