@@ -51,7 +51,7 @@ func (zd *ZeroDownload) Requert(url string) (*http.Response, error) {
 }
 
 func (zd *ZeroDownload) DownloadComic(urls []string) {
-	if err := os.MkdirAll(zd.OutPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(zd.OutPath, 0744); err != nil {
 		log.Fatal(err)
 	}
 
@@ -75,7 +75,7 @@ func (zd *ZeroDownload) DownloadPage(page *Page, path string) {
 		return
 	}
 
-	if err := os.MkdirAll(path+"/"+page.Name, os.ModePerm); err != nil {
+	if err := os.MkdirAll(path+"/"+page.Name, 0744); err != nil {
 		log.Fatal(err)
 	}
 
@@ -86,20 +86,22 @@ func (zd *ZeroDownload) DownloadPage(page *Page, path string) {
 		ch <- struct{}{}
 	}
 
+	wg := sync.WaitGroup{}
 	for _, url := range dlUrls {
 		<-ch
+		wg.Add(1)
 		go func(url string) {
+			defer wg.Done()
 			var retry int
 			zd.DownloadImage(url, path+"/"+page.Name, &retry)
 			ch <- struct{}{}
 		}(url)
 	}
+	wg.Wait()
 }
 
 func (zd *ZeroDownload) DownloadImage(url, path string, retry *int) {
-	tempArr := strings.Split(url, "/")
-	fileName := tempArr[len(tempArr)-1]
-	imagePath := path + "/" + fileName
+	imagePath := zd.getFullPath(url, path)
 
 	_, err := os.Stat(imagePath)
 	if err == nil {
@@ -107,19 +109,9 @@ func (zd *ZeroDownload) DownloadImage(url, path string, retry *int) {
 		return
 	}
 
-	retryFun := func() {
-		log.Printf("Download failed/下载图片失败: %s, Retry/重试次数: %d, Retrying after 5 seconds/5s后进行重试", imagePath, *retry)
-		if *retry > 8 {
-			log.Printf("Exceeded retry count/超过重试次数: %s", imagePath)
-		}
-		*retry++
-		time.Sleep(time.Second * 5)
-		zd.DownloadImage(url, path, retry)
-	}
-
 	resp, err := zd.Requert(url)
 	if err != nil {
-		retryFun()
+		zd.retryDownLoad(url, path, retry)
 		return
 	}
 	defer resp.Body.Close()
@@ -130,7 +122,7 @@ func (zd *ZeroDownload) DownloadImage(url, path string, retry *int) {
 
 	file, err := os.Create(imagePath)
 	if err != nil {
-		log.Fatalf("Created failed/创建图片失败: %s %s", fileName, err.Error())
+		log.Fatalf("Created failed/创建图片失败: %s %s", imagePath, err.Error())
 	}
 	wt := bufio.NewWriter(file)
 	defer file.Close()
@@ -151,7 +143,7 @@ func (zd *ZeroDownload) DownloadImage(url, path string, retry *int) {
 			}
 		}
 
-		retryFun()
+		zd.retryDownLoad(url, path, retry)
 		return
 	}
 	wt.Flush()
@@ -237,4 +229,21 @@ func (zd *ZeroDownload) GetComicPageInfo(url string) *Comic {
 	wg.Wait()
 
 	return comic
+}
+
+func (zd *ZeroDownload) retryDownLoad(url, path string, retry *int) {
+	imagePath := zd.getFullPath(url, path)
+	log.Printf("Download failed/下载图片失败: %s, Retry/重试次数: %d, Retrying after 5 seconds/5s后进行重试", imagePath, *retry)
+	if *retry > 8 {
+		log.Printf("Exceeded retry count/超过重试次数: %s", imagePath)
+	}
+	*retry++
+	time.Sleep(time.Second * 5)
+	zd.DownloadImage(url, path, retry)
+}
+
+func (zd *ZeroDownload) getFullPath(url, path string) string {
+	tempArr := strings.Split(url, "/")
+	fileName := tempArr[len(tempArr)-1]
+	return path + "/" + fileName
 }
