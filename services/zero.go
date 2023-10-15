@@ -22,8 +22,8 @@ type ZeroDownload struct {
 }
 
 type Comic struct {
-	Title   string
-	PageMap *sync.Map
+	Title string
+	Pages []Page
 }
 
 type Page struct {
@@ -59,16 +59,14 @@ func (zd *ZeroDownload) DownloadComic(urls []string) {
 		comic := zd.GetComicPageInfo(comicUrl)
 
 		log.Printf("Start downloading/开始下载: %s", comic.Title)
-		comic.PageMap.Range(func(key, value any) bool {
-			page := value.(*Page)
+		for _, page := range comic.Pages {
 			zd.DownloadPage(page, zd.OutPath+"/"+comic.Title)
-			return true
-		})
+		}
 		log.Printf("Download completed/下载完成: %s", comic.Title)
 	}
 }
 
-func (zd *ZeroDownload) DownloadPage(page *Page, path string) {
+func (zd *ZeroDownload) DownloadPage(page Page, path string) {
 	if len(page.Urls) == 0 {
 		log.Printf(`The chapter image list is empty, non members cannot view the last three chapters. You need to recharge the member, find the cookie, and fill it in config.json before re executing.
 章节图片列表为空，非会员不能查看最后的3个章节，需要充值会员后找到cookie填入config.json里再重新执行: %s`, page.Name)
@@ -171,23 +169,21 @@ func (zd *ZeroDownload) GetComicPageInfo(url string) *Comic {
 	til := reg.ReplaceAll([]byte(title), []byte{})
 
 	comic := &Comic{
-		PageMap: &sync.Map{},
-		Title:   string(til),
+		Pages: []Page{},
+		Title: string(til),
 	}
 
 	log.Printf("Preparing to obtain chapter information/准备获取章节信息: %s", comic.Title)
 
 	wg := &sync.WaitGroup{}
-	doc.Find(".uk-grid-collapse .muludiv a").Each(func(i int, s *goquery.Selection) {
-		pageName := s.Text()
-		pageInfo, ok := comic.PageMap.Load(pageName)
-		if !ok {
-			pageInfo = &Page{
-				Name: pageName,
-			}
+	pages := doc.Find(".uk-grid-collapse .muludiv a")
+	comic.Pages = make([]Page, pages.Length())
+
+	pages.Each(func(i int, s *goquery.Selection) {
+		page := Page{
+			Name: s.Text(),
 		}
 
-		page := pageInfo.(*Page)
 		href, _ := s.Attr("href")
 		reg := regexp.MustCompile(`^(https|http|ftp)\:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}`)
 		matchArr := reg.FindStringSubmatch(url)
@@ -213,16 +209,20 @@ func (zd *ZeroDownload) GetComicPageInfo(url string) *Comic {
 			if err != nil {
 				log.Fatal(err)
 			}
-			doc.Find(".uk-zjimg img").Each(func(i int, s *goquery.Selection) {
+
+			imgs := doc.Find(".uk-zjimg img")
+			page.Total = imgs.Length()
+			page.Urls = make([]string, page.Total)
+
+			imgs.Each(func(i int, s *goquery.Selection) {
 				if imageUrl, ok := s.Attr("src"); ok {
-					page.Urls = append(page.Urls, imageUrl)
+					page.Urls[i] = imageUrl
 				}
 			})
 
-			page.Total = doc.Find(".uk-zjimg img").Length()
 			log.Printf("%s, chapter/章节: %s, total/总数: %d", comic.Title, page.Name, page.Total)
 
-			comic.PageMap.Store(pageName, page)
+			comic.Pages[i] = page
 		}(page.PageUrl)
 	})
 
